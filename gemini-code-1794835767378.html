@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ปฏิทินตารางส่งงาน</title>
+  <style>
+    /* ส่วนของ CSS: ตกแต่งหน้าตาและจัดตาราง */
+    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 0 16px; background: #f8fafc; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 12px; }
+    .day-name { text-align: center; font-weight: bold; color: #64748b; }
+    .cell { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; min-height: 60px; padding: 6px; cursor: pointer; }
+    .cell.selected { border: 2px solid #2563eb; background: #eff6ff; }
+    .cell.today { background: #fef9c3; }
+    .badge { display: inline-block; background: #ef4444; color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-top: 4px; }
+    .task-box { margin-top: 20px; background: #fff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .done { text-decoration: line-through; color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+  <!-- ส่วนของ HTML: โครงสร้างปุ่มและพื้นที่แสดงผล -->
+  <div class="header">
+    <button onclick="changeMonth(-1)">◀ ก่อนหน้า</button>
+    <h2 id="monthTitle"></h2>
+    <button onclick="changeMonth(1)">ถัดไป ▶</button>
+  </div>
+
+  <div class="grid" id="calendar"></div>
+
+  <div class="task-box">
+    <h3 id="selectedDateText">เลือกวันที่เพื่อดูงาน</h3>
+    <input type="text" id="taskInput" placeholder="พิมพ์ชื่องานที่ต้องส่ง..." />
+    <button onclick="addTask()">เพิ่มงาน</button>
+    <ul id="taskList"></ul>
+  </div>
+
+  <script>
+    // ส่วนของ JavaScript: ระบบคำนวณและจัดการข้อมูล
+    let currentDate = new Date();
+    let selectedDateStr = formatDate(new Date());
+    let tasks = JSON.parse(localStorage.getItem('myTasks')) || {};
+
+    function formatDate(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function saveTasks() {
+      localStorage.setItem('myTasks', JSON.stringify(tasks));
+    }
+
+    function renderCalendar() {
+      const calendar = document.getElementById('calendar');
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      document.getElementById('monthTitle').innerText =
+        currentDate.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+
+      calendar.innerHTML = '';
+      ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].forEach(d => {
+        calendar.innerHTML += `<div class="day-name">${d}</div>`;
+      });
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const todayStr = formatDate(new Date());
+
+      for (let i = 0; i < firstDay; i++) {
+        calendar.innerHTML += `<div></div>`;
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayTasks = tasks[dateStr] || [];
+        const pendingCount = dayTasks.filter(t => !t.done).length;
+
+        const cell = document.createElement('div');
+        cell.className = `cell ${dateStr === selectedDateStr ? 'selected' : ''} ${dateStr === todayStr ? 'today' : ''}`;
+        cell.innerHTML = `<div>${day}</div>` + (pendingCount > 0 ? `<span class="badge">${pendingCount} งาน</span>` : '');
+        cell.onclick = () => {
+          selectedDateStr = dateStr;
+          renderCalendar();
+          renderTasks();
+        };
+        calendar.appendChild(cell);
+      }
+    }
+
+    function renderTasks() {
+      document.getElementById('selectedDateText').innerText = `งานวันที่: ${selectedDateStr}`;
+      const list = document.getElementById('taskList');
+      list.innerHTML = '';
+
+      (tasks[selectedDateStr] || []).forEach((task, index) => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="${task.done ? 'done' : ''}" style="cursor:pointer" onclick="toggleTask(${index})">
+            ${task.done ? '✅' : '⬜'} ${task.title}
+          </span>
+          <button onclick="deleteTask(${index})" style="margin-left:8px">ลบ</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function addTask() {
+      const input = document.getElementById('taskInput');
+      const title = input.value.trim();
+      if (!title) return;
+
+      if (!tasks[selectedDateStr]) tasks[selectedDateStr] = [];
+      tasks[selectedDateStr].push({ title, done: false });
+      input.value = '';
+      saveTasks();
+      renderCalendar();
+      renderTasks();
+    }
+
+    function toggleTask(index) {
+      tasks[selectedDateStr][index].done = !tasks[selectedDateStr][index].done;
+      saveTasks();
+      renderCalendar();
+      renderTasks();
+    }
+
+    function deleteTask(index) {
+      tasks[selectedDateStr].splice(index, 1);
+      saveTasks();
+      renderCalendar();
+      renderTasks();
+    }
+
+    function changeMonth(step) {
+      currentDate.setDate(1);
+      currentDate.setMonth(currentDate.getMonth() + step);
+      renderCalendar();
+    }
+
+    renderCalendar();
+    renderTasks();
+  </script>
+</body>
+</html>
